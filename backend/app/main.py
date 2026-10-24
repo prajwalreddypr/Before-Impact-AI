@@ -26,7 +26,7 @@ from .scenario import calculate_exposure
 from .seed import DEMO_EMAIL, password_hash, seed_demo
 
 
-app = FastAPI(title="BeforeImpact AI", version="1.0.0", description="Climate resilience replay and preparation API")
+app = FastAPI(title="SustainBuild AI", version="1.0.0", description="Climate-resilient and sustainable construction planning API")
 origins = [x.strip() for x in os.getenv(
     "CORS_ORIGINS",
     "http://localhost:3000,http://127.0.0.1:3000",
@@ -46,7 +46,7 @@ def demo_site(site_id, name, region, lat, lon, plot, rainfall, carbon, hazards, 
             "hazards":hazards,"environment":{"sensitivity":sensitivity,"protected_overlap":"None in demo record","developed_land_pct":68},
             "air_quality":{"pm25":11.2,"pm10":22.4,"no2":18.0,"o3":41.0,"so2":2.1,"co":0.4,"period":"Synthetic annual profile 2025"},
             "regional_ghg":{"co2_kt":1240,"ch4_ktco2e":84,"n2o_ktco2e":31,"year":2024},
-            "data_completeness":completeness,"status":"synthetic","source":"BeforeImpact curated hackathon dataset","retrieved":"2026-10-24"}
+            "data_completeness":completeness,"status":"synthetic","source":"SustainBuild curated hackathon dataset","retrieved":"2026-10-24"}
 
 
 SITE_PRESETS = [
@@ -250,7 +250,7 @@ class SustainabilityIn(BaseModel):
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "BeforeImpact AI", "model_version": "exposure-1.0"}
+    return {"status": "ok", "service": "SustainBuild AI", "model_version": "exposure-1.0"}
 
 
 @app.get("/api/site-presets")
@@ -811,7 +811,7 @@ def create_report(body: ReportIn, db: Session = Depends(get_db), user=Depends(cu
         if not scenario or scenario.facility_id != facility.id: raise HTTPException(422, "Invalid scenario")
     row = Report(user_id=user.id, facility_id=facility.id, scenario_id=body.scenario_id, report_type=body.report_type, title=body.title)
     db.add(row); db.flush(); path = UPLOAD_DIR / f"report-{row.id}.pdf"
-    pdf = canvas.Canvas(str(path), pagesize=A4); pdf.setTitle(body.title); pdf.setFont("Helvetica-Bold", 18); pdf.drawString(54, 790, "BeforeImpact AI")
+    pdf = canvas.Canvas(str(path), pagesize=A4); pdf.setTitle(body.title); pdf.setFont("Helvetica-Bold", 18); pdf.drawString(54, 790, "SustainBuild AI")
     pdf.setFont("Helvetica", 12); pdf.drawString(54, 760, body.title); pdf.drawString(54, 735, facility.name); pdf.drawString(54, 700, "Illustrative climate-resilience scenario report")
     pdf.drawString(54, 675, "Not an engineering, safety, insurance, or certified flood-risk assessment."); pdf.save()
     row.file_path = str(path); db.commit(); db.refresh(row); return as_dict(row)
@@ -833,7 +833,7 @@ def create_project_report(project_id: int, db: Session = Depends(get_db), user=D
         pdf.setFont("Helvetica-Bold" if bold else "Helvetica", 11 if bold else 9)
         for segment in [str(text)[i:i+96] for i in range(0,len(str(text)),96)] or [""]:
             pdf.drawString(48,y,segment); y -= gap
-    pdf.setTitle(row.title); pdf.setFont("Helvetica-Bold",19); pdf.drawString(48,y,"BeforeImpact AI - Construction Planning Report"); y-=28
+    pdf.setTitle(row.title); pdf.setFont("Helvetica-Bold",19); pdf.drawString(48,y,"SustainBuild AI - Construction Planning Report"); y-=28
     line(project.name, True); line(f"Building: {project.building_type} | Region: {project.region} | Demo data status: synthetic")
     data = project.project_data_json or {}; site_ids = project.selected_site_ids_json or []
     sections = [("Project requirements",data.get("requirements",{})),("Selected candidate sites",site_ids),
@@ -841,7 +841,7 @@ def create_project_report(project_id: int, db: Session = Depends(get_db), user=D
                 ("Adaptations tested",data.get("adaptations",{})),("Sustainability assessment",data.get("sustainability",{}))]
     for title, content in sections: line(title,True,18); line(content)
     line("Decision context",True,18); line("Use this report to compare visible assumptions and trade-offs. It does not grant permission or replace architects, engineers, environmental consultants, authorities, or official hazard assessments.")
-    line("Data provenance",True,18); line("BeforeImpact curated hackathon dataset; synthetic/modelled status; retrieved 2026-10-24. User-selected stress tests are hypothetical.")
+    line("Data provenance",True,18); line("SustainBuild curated hackathon dataset; synthetic/modelled status; retrieved 2026-10-24. User-selected stress tests are hypothetical.")
     pdf.save(); row.file_path=str(path); db.commit(); db.refresh(row)
     return as_dict(row)
 
@@ -862,7 +862,7 @@ def report(report_id: int, db: Session = Depends(get_db), user=Depends(current_u
 def report_download(report_id: int, db: Session = Depends(get_db), user=Depends(current_user)):
     row = db.get(Report, report_id)
     if not row or row.user_id != user.id: raise HTTPException(404, "Report not found")
-    return FileResponse(row.file_path, filename=f"beforeimpact-report-{row.id}.pdf", media_type="application/pdf")
+    return FileResponse(row.file_path, filename=f"sustainbuild-report-{row.id}.pdf", media_type="application/pdf")
 
 
 @app.get("/api/demo/status")

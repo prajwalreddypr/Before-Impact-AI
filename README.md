@@ -1,10 +1,10 @@
-# BeforeImpact AI
+# SustainBuild AI
 
-**Before You Build, Understand the Impact.** BeforeImpact is a climate-resilient and sustainable construction-planning workspace. It helps communities, architects, and developers compare candidate sites, confirm blueprint geometry, test conceptual hazards and adaptations, and understand sustainability trade-offs before construction begins.
+**Before You Build, Understand the Impact.** SustainBuild is a climate-resilient and sustainable construction-planning workspace. It helps communities, architects, and developers compare candidate sites, confirm blueprint geometry, test conceptual hazards and adaptations, and understand sustainability trade-offs before construction begins.
 
 ## Demo account
 
-- Email: `demo@beforeimpact.ai`
+- Email: `demo@beforeimpact.ai` (legacy internal demo credential retained for existing local data)
 - Password: `Demo123!`
 
 The included candidate plots, climate profiles, planning constraints, pollution values, and hazard contexts are fictional hackathon demo data. They are visibly labelled synthetic and are not land listings, official measurements, permissions, or engineering advice.
@@ -18,7 +18,7 @@ The included candidate plots, climate profiles, planning constraints, pollution 
 
 ## Blueprint understanding
 
-After a PDF, PNG, or JPEG plan is uploaded, BeforeImpact scans it into a strict structured result: footprint dimensions, floor count, room/zone labels, approximate areas, confidence, assumptions, and uncertainties. The user must review or correct those findings before the conceptual 3D model is generated.
+After a PDF, PNG, or JPEG plan is uploaded, SustainBuild scans it into a strict structured result: footprint dimensions, floor count, room/zone labels, approximate areas, confidence, assumptions, and uncertainties. The user must review or correct those findings before the conceptual 3D model is generated.
 
 Set `OPENAI_API_KEY` to enable multimodal analysis through the OpenAI Responses API. `OPENAI_BLUEPRINT_MODEL` controls the vision-capable model and defaults to `gpt-6-astra`. Without a key—or if analysis is unavailable—the UI clearly identifies the result as **Demo Extraction** and uses a deterministic building-type profile instead of claiming that AI inspected the drawing.
 
@@ -69,4 +69,4 @@ npm run build
 
 ## Limits
 
-Scenario graphics are conceptual exposure illustrations—not validated structural, hydrological, thermal, fire-spread, seismic-response, code-compliance, or lifecycle assessments. BeforeImpact does not replace architects, engineers, environmental consultants, permitting authorities, or official hazard assessments.
+Scenario graphics are conceptual exposure illustrations—not validated structural, hydrological, thermal, fire-spread, seismic-response, code-compliance, or lifecycle assessments. SustainBuild does not replace architects, engineers, environmental consultants, permitting authorities, or official hazard assessments.

@@ -1,4 +1,4 @@
-# BeforeImpact AI implementation progress
+# SustainBuild AI implementation progress
 
 - [x] Inspect repository and implementation specification
 - [x] Establish local-first monorepo architecture

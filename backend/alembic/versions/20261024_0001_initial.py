@@ -1,4 +1,4 @@
-"""Initial BeforeImpact persistence schema."""
+"""Initial SustainBuild persistence schema."""
 from alembic import op
 
 from app.db import Base

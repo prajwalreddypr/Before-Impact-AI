@@ -115,7 +115,7 @@ class Warning(Base):
     issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     valid_from: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     valid_to: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    provider: Mapped[str] = mapped_column(String(120), default="BeforeImpact demo")
+    provider: Mapped[str] = mapped_column(String(120), default="SustainBuild demo")
     text: Mapped[str] = mapped_column(Text, default="")
     source_url: Mapped[str] = mapped_column(String(500), default="")
     is_synthetic: Mapped[bool] = mapped_column(Boolean, default=True)

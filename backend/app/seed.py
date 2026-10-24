@@ -56,7 +56,7 @@ def _event_series(db, facility, name, hazard, offset_days, depth=0, mode="histor
     peak = start + timedelta(hours=24)
     event = WeatherEvent(facility_id=facility.id, name=name, hazard_type=hazard, event_mode=mode,
                          start_at=start, peak_at=peak, end_at=start + timedelta(hours=48),
-                         provider="BeforeImpact reproducible demo", source_url="", is_synthetic=True,
+                         provider="SustainBuild reproducible demo", source_url="", is_synthetic=True,
                          scenario_depth_m=depth)
     db.add(event); db.flush()
     for hour in range(49):
@@ -120,7 +120,7 @@ def _ensure_climate_portfolio(db, user):
         if event:
             db.add(Warning(facility_id=facility.id, weather_event_id=event.id, hazard_type=hazard,
                 severity=severity, title=title, issued_at=event.start_at - timedelta(hours=6),
-                valid_from=event.start_at, valid_to=event.end_at, provider="BeforeImpact synthetic demo",
+                valid_from=event.start_at, valid_to=event.end_at, provider="SustainBuild synthetic demo",
                 text=f"{title} signal for {facility.name}.", is_synthetic=True))
 
 
@@ -194,4 +194,4 @@ def seed_demo():
 
 if __name__ == "__main__":
     seed_demo()
-    print("BeforeImpact demo data ready")
+    print("SustainBuild demo data ready")
