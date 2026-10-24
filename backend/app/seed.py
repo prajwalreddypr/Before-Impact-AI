@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from .db import Base, SessionLocal, engine
 from .models import (Asset, Blueprint, BlueprintMarker, Facility, PreparationAction,
-                     Scenario, ScenarioResult, User, WeatherEvent, WeatherReading)
+                     Scenario, ScenarioResult, User, Warning, WeatherEvent, WeatherReading)
 from .scenario import calculate_exposure
 
 
@@ -46,6 +46,8 @@ ACTION_TITLES = {
     "rain": ["Inspect roof drainage", "Clear safe surface drains", "Move water-sensitive stock", "Check temporary covers", "Protect document storage", "Review safe access routes", "Confirm pump readiness", "Monitor official updates"],
     "flood": ["Raise portable inventory", "Isolate vulnerable electrics", "Position approved barriers", "Move vehicles to higher ground", "Verify evacuation routes", "Protect critical records", "Confirm pump maintenance", "Request professional flood review"],
     "heat": ["Reschedule exposed work", "Check cooling equipment", "Protect temperature-sensitive stock", "Provide shaded rest areas", "Review hydration plan", "Monitor indoor heat", "Inspect refrigeration alarms", "Plan welfare check-ins"],
+    "wildfire": ["Clear safe access routes", "Move combustibles from structures", "Check smoke filtration", "Protect critical records", "Review evacuation triggers", "Confirm staff contacts"],
+    "drought": ["Review water reserves", "Inspect irrigation leaks", "Prioritise critical water use", "Protect sensitive stock", "Check soil moisture", "Request water-plan review"],
 }
 
 
@@ -64,6 +66,8 @@ def _event_series(db, facility, name, hazard, offset_days, depth=0, mode="histor
             "rain": (10 + 15 * curve, 18 + 24 * curve, 1 + 18 * curve, 15 - 2 * curve),
             "flood": (8 + 8 * curve, 15 + 12 * curve, 1 + 9 * curve, 13),
             "heat": (7 + 4 * curve, 11 + 5 * curve, 0, 28 + 14 * curve),
+            "wildfire": (12 + 20 * curve, 20 + 32 * curve, 0, 26 + 10 * curve),
+            "drought": (8 + 5 * curve, 14 + 8 * curve, 0, 30 + 8 * curve),
             "normal": (8, 13, 0, 19),
         }[hazard]
         db.add(WeatherReading(weather_event_id=event.id, timestamp=start + timedelta(hours=hour),
@@ -75,10 +79,58 @@ def _event_series(db, facility, name, hazard, offset_days, depth=0, mode="histor
     return event
 
 
+def _ensure_climate_portfolio(db, user):
+    facilities = {f.name: f for f in db.scalars(select(Facility).where(Facility.owner_user_id == user.id))}
+    additions = [
+        ("Coastal Workshop", "Coastal fire-weather window", "wildfire", 275),
+        ("Urban Manufacturing Plant", "Extended dry-period stress", "drought", 305),
+    ]
+    for facility_name, event_name, hazard, offset in additions:
+        facility = facilities.get(facility_name)
+        if facility and not db.scalar(select(WeatherEvent).where(WeatherEvent.name == event_name)):
+            _event_series(db, facility, event_name, hazard, offset, mode="what_if")
+    db.flush()
+
+    for hazard, titles in ACTION_TITLES.items():
+        if db.scalar(select(PreparationAction).where(PreparationAction.hazard_type == hazard)):
+            continue
+        for i, title in enumerate(titles):
+            db.add(PreparationAction(hazard_type=hazard, asset_type="all", title=title,
+                description="Complete only while conditions are safe.",
+                rationale=f"Reduces avoidable {hazard} exposure under the stated assumptions.",
+                estimated_minutes=15 + (i % 3) * 15, priority="high" if i < 2 else "medium",
+                safety_conditions_json={"follow_official_guidance": True},
+                references_json=[{"title": "Ready.gov hazard guidance", "url": "https://www.ready.gov/"}],
+                professional_review=("review" in title.lower())))
+    db.flush()
+
+    warning_specs = [
+        ("GreenVale Greenhouses", "wind", "severe", "Severe wind"),
+        ("Riverside Distribution Centre", "flood", "severe", "Flood scenario"),
+        ("Riverside Distribution Centre", "rain", "moderate", "Heavy rain"),
+        ("Sunfield Farm", "heat", "severe", "Extreme heat"),
+        ("Coastal Workshop", "wildfire", "high", "Fire weather"),
+        ("Urban Manufacturing Plant", "drought", "moderate", "Drought stress"),
+    ]
+    for facility_name, hazard, severity, title in warning_specs:
+        facility = facilities.get(facility_name)
+        if not facility or db.scalar(select(Warning).where(Warning.facility_id == facility.id, Warning.hazard_type == hazard)):
+            continue
+        event = db.scalar(select(WeatherEvent).where(WeatherEvent.facility_id == facility.id, WeatherEvent.hazard_type == hazard).order_by(WeatherEvent.id))
+        if event:
+            db.add(Warning(facility_id=facility.id, weather_event_id=event.id, hazard_type=hazard,
+                severity=severity, title=title, issued_at=event.start_at - timedelta(hours=6),
+                valid_from=event.start_at, valid_to=event.end_at, provider="BeforeImpact synthetic demo",
+                text=f"{title} signal for {facility.name}.", is_synthetic=True))
+
+
 def seed_demo():
     Base.metadata.create_all(engine)
     with SessionLocal() as db:
-        if db.scalar(select(User).where(User.email == DEMO_EMAIL)):
+        existing_user = db.scalar(select(User).where(User.email == DEMO_EMAIL))
+        if existing_user:
+            _ensure_climate_portfolio(db, existing_user)
+            db.commit()
             return
         user = User(email=DEMO_EMAIL, password_hash=password_hash("Demo123!"), display_name="Alex Morgan")
         db.add(user); db.flush()
@@ -136,6 +188,7 @@ def seed_demo():
         db.add(bp); db.flush()
         for label, x, y in [("Storage", .2, .35), ("Sorting hall", .5, .35), ("Electrical", .82, .35)]:
             db.add(BlueprintMarker(blueprint_id=bp.id, normalized_x=x, normalized_y=y, label=label, marker_type="asset"))
+        _ensure_climate_portfolio(db, user)
         db.commit()
 
 

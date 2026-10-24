@@ -42,9 +42,9 @@ function WindField({speed,direction}:{speed:number;direction:number}) {
 function Scene({assets,event,reading}:{assets:Asset[];event:Event;reading:Reading}) {
   const {selectedAssetId,selectAsset,cameraMode}=useSimulation(); const hazard=event.hazard_type; const rain=hazard==="rain"||hazard==="flood"?reading.rainfall_mm:0; const flood=hazard==="flood"?event.scenario_depth_m*(Math.min(1,Math.max(0,(reading.rainfall_mm-1)/9))):0;
   return <>
-    <CameraRig mode={cameraMode}/><color attach="background" args={[hazard==="rain"||hazard==="flood"?"#5a5150":hazard==="heat"?"#f2ba5d":"#e8b48f"]}/><fog attach="fog" args={[hazard==="rain"?"#5a5150":"#e8b48f",25,60]}/>
+    <CameraRig mode={cameraMode}/><color attach="background" args={[hazard==="rain"||hazard==="flood"?"#5a5150":hazard==="wildfire"?"#c86243":hazard==="heat"||hazard==="drought"?"#f2ba5d":"#e8b48f"]}/><fog attach="fog" args={[hazard==="rain"?"#5a5150":hazard==="wildfire"?"#b85b43":"#e8b48f",25,60]}/>
     <ambientLight intensity={hazard==="rain"?.6:1.15}/><directionalLight position={[10,18,8]} intensity={hazard==="heat"?3:1.7} color={hazard==="heat"?"#ffd28c":"#fff7df"} castShadow shadow-mapSize={[1024,1024]}/>
-    <mesh rotation={[-Math.PI/2,0,0]} receiveShadow onClick={()=>selectAsset(null)}><planeGeometry args={[70,55]}/><meshStandardMaterial color={rain?"#6f625b":"#c88f62"} roughness={rain?.34:.9}/></mesh>
+    <mesh rotation={[-Math.PI/2,0,0]} receiveShadow onClick={()=>selectAsset(null)}><planeGeometry args={[70,55]}/><meshStandardMaterial color={rain?"#6f625b":hazard==="wildfire"?"#7c4b37":hazard==="drought"?"#d8ad67":"#c88f62"} roughness={rain?.34:.9}/></mesh>
     <Grid args={[48,38]} position={[0,.012,0]} cellColor="#e2b389" sectionColor="#8e6551" fadeDistance={35}/>
     {assets.filter(a=>a.asset_type==="greenhouse").map(a=><Greenhouse key={a.id} asset={a} selected={a.id===selectedAssetId} onSelect={()=>selectAsset(a.id)}/>)}
     <mesh position={[7,1.4,4]} castShadow onClick={()=>{const a=assets.find(x=>x.asset_type==="building");if(a)selectAsset(a.id)}}><boxGeometry args={[4,2.8,4]}/><meshStandardMaterial color={selectedAssetId===assets.find(x=>x.asset_type==="building")?.id?"#e4ad61":"#6f786d"}/></mesh>

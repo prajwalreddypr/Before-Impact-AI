@@ -89,6 +89,23 @@ class WeatherReading(Base):
     quality_metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
+class Warning(Base):
+    __tablename__ = "warnings"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    facility_id: Mapped[int] = mapped_column(ForeignKey("facilities.id", ondelete="CASCADE"), index=True)
+    weather_event_id: Mapped[int] = mapped_column(ForeignKey("weather_events.id", ondelete="CASCADE"), index=True)
+    hazard_type: Mapped[str] = mapped_column(String(30), index=True)
+    severity: Mapped[str] = mapped_column(String(20))
+    title: Mapped[str] = mapped_column(String(180))
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    valid_from: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    valid_to: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    provider: Mapped[str] = mapped_column(String(120), default="BeforeImpact demo")
+    text: Mapped[str] = mapped_column(Text, default="")
+    source_url: Mapped[str] = mapped_column(String(500), default="")
+    is_synthetic: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
 class PreparationAction(Base):
     __tablename__ = "preparation_actions"
     id: Mapped[int] = mapped_column(primary_key=True)

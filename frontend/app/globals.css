@@ -114,3 +114,42 @@ html,body{background:#fff8ef;color:#1f1a17}
 .recharts-text{fill:#8a6f61}
 .scene-legend i.normal{background:#f0ae3d}
 .pulse-dot{background:#ffd35f}
+
+/* Compact multi-hazard overview */
+.compact-overview{padding-top:30px}
+.compact-overview .page-heading{margin-bottom:16px}
+.compact-overview .page-heading h1{font-size:34px;margin:0 0 3px}
+.climate-summary{display:flex;align-items:center;gap:20px;padding:20px 24px;border-radius:15px;background:#211a17;color:#fff8ef}
+.climate-summary>div:first-child{display:grid;grid-template-columns:auto auto;align-items:baseline;gap:0 7px;padding-right:20px;border-right:1px solid rgba(255,255,255,.18)}
+.climate-summary>div:first-child span{grid-column:span 2;color:#ffb197;font-size:9px;font-weight:700;letter-spacing:.12em}
+.climate-summary>div:first-child b{font-size:31px;color:#ffd35f}
+.climate-summary>div:first-child small{font-size:11px;color:#d6c5bb}
+.climate-summary h2{font-size:22px;margin:0}
+.climate-summary>p{margin:0;color:#bfaea5;font-size:11px}
+.summary-icons{margin-left:auto;display:flex!important;gap:8px!important;border:0!important;padding:0!important}
+.summary-icons span{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#fff0c4;color:#1f1a17;font-size:16px}
+.warning-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
+.warning-card{position:relative;display:grid;grid-template-columns:42px 1fr auto 16px;align-items:center;gap:11px;min-height:82px;padding:13px 15px;border:1px solid #ead9ce;border-radius:12px;background:#fffdf9;color:#1f1a17;text-align:left;transition:transform .15s ease,box-shadow .15s ease}
+.warning-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(76,43,28,.1)}
+.warning-icon{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:#ffe0d2;color:#c93f3a;font-size:21px}
+.warning-card.flood .warning-icon,.warning-card.rain .warning-icon{background:#dce9f2;color:#345d78}
+.warning-card.heat .warning-icon,.warning-card.drought .warning-icon{background:#fff0c4;color:#9a651e}
+.warning-card.wildfire .warning-icon{background:#ffd3bd;color:#b43f2e}
+.warning-main{display:flex;flex-direction:column;min-width:0}
+.warning-main small{font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#8b7569}
+.warning-main b{font-size:13px;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.warning-main em{font-size:10px;color:#76675e;font-style:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.warning-level{padding:4px 7px;border-radius:12px;background:#fff0c4;color:#78501b;font-size:8px;font-weight:700;text-transform:uppercase}
+.warning-level.severe{background:#ffd8cf;color:#9d3228}
+.warning-level.high{background:#ffe1c8;color:#90461f}
+.warning-card>svg{color:#a18c80}
+.simple-grid{grid-template-columns:1.5fr .85fr;margin-top:0}
+.simple-grid .trend-panel{grid-column:auto}
+.simple-grid .scenario-panel{grid-column:span 2}
+.simple-grid .panel{padding:18px}
+.simple-grid .chart-wrap{height:180px}
+.clean-list>div{padding:9px 0}
+.clean-list>div>b{font-size:11px;flex:1}
+.simple-grid .scenario-row{grid-template-columns:8px 1fr auto}
+@media(max-width:900px){.warning-grid{grid-template-columns:repeat(2,1fr)}.summary-icons span:nth-child(n+5){display:none}}
+@media(max-width:600px){.climate-summary{padding:16px}.climate-summary>p{display:none}.summary-icons{display:none!important}.warning-grid{grid-template-columns:1fr}.simple-grid{grid-template-columns:1fr}.simple-grid .scenario-panel{grid-column:auto}.warning-card{min-height:74px}}

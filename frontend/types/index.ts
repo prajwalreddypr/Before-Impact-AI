@@ -9,3 +9,4 @@ export type Plan = { id:number; summary:string; generated_by:string; items:PlanI
 export type ScenarioResult = { exposure_score:number; potential_loss_range:number[]; protection_modifier:number; actions_applied:number; illustrative:boolean; limitations:string };
 export type Scenario = { id:number; name:string; scenario_type:string; created_at:string; result:ScenarioResult };
 export type Report = { id:number; title:string; report_type:string; created_at:string; facility_id:number };
+export type Warning = { id:number; facility_id:number; weather_event_id:number; hazard_type:string; severity:string; title:string; facility_name:string; country:string; event_name:string; valid_from:string; valid_to:string; is_synthetic:boolean };

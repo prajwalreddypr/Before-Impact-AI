@@ -7,7 +7,7 @@ COEFFICIENTS = {
 
 def calculate_exposure(assets, event, selected_action_ids):
     selected = len(set(selected_action_ids or []))
-    severity = {"wind": 0.78, "rain": 0.58, "flood": 0.82, "heat": 0.66}.get(event.hazard_type, 0.5)
+    severity = {"wind": 0.78, "rain": 0.58, "flood": 0.82, "heat": 0.66, "wildfire": 0.76, "drought": 0.61}.get(event.hazard_type, 0.5)
     protection = min(0.48, selected * 0.09)
     rows, low, high = [], 0.0, 0.0
     for asset in assets:

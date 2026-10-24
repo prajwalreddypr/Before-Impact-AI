@@ -24,6 +24,14 @@ def test_timeline_is_ordered(client, auth):
     assert payload["source"]["synthetic"] is True
 
 
+def test_portfolio_has_six_major_hazards(client, auth):
+    payload = client.get("/api/warnings", headers=auth)
+    assert payload.status_code == 200
+    warnings = payload.json()["warnings"]
+    assert {x["hazard_type"] for x in warnings} == {"wind", "flood", "rain", "heat", "wildfire", "drought"}
+    assert all(x["is_synthetic"] for x in warnings)
+
+
 def test_plan_persistence_and_scenario_difference(client, auth):
     facility = client.get("/api/facilities", headers=auth).json()[0]
     event = client.get(f"/api/facilities/{facility['id']}/events", headers=auth).json()[0]

@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from .db import Base, engine, get_db
 from .models import (Asset, Blueprint, BlueprintMarker, Facility, PlanItem,
                      PreparationAction, PreparationPlan, Report, Scenario,
-                     ScenarioResult, User, WeatherEvent, WeatherReading)
+                     ScenarioResult, User, Warning, WeatherEvent, WeatherReading)
 from .scenario import calculate_exposure
 from .seed import DEMO_EMAIL, password_hash, seed_demo
 
@@ -275,7 +275,26 @@ def forecast(facility_id: int, db: Session = Depends(get_db), user=Depends(curre
 @app.get("/api/facilities/{facility_id}/warnings")
 def warnings(facility_id: int, db: Session = Depends(get_db), user=Depends(current_user)):
     owned_facility(db, user, facility_id)
-    return {"warnings": [], "message": "No official warning integration is available for this demo location. No alert has been fabricated."}
+    rows = list(db.scalars(select(Warning).where(Warning.facility_id == facility_id).order_by(Warning.id)))
+    return {"warnings": [warning_payload(x, db) for x in rows], "official_feed": False,
+            "message": "Synthetic demonstration signals; no official alert has been fabricated."}
+
+
+def warning_payload(row, db):
+    data = as_dict(row)
+    facility = db.get(Facility, row.facility_id)
+    event = db.get(WeatherEvent, row.weather_event_id)
+    data["facility_name"] = facility.name
+    data["country"] = facility.country
+    data["event_name"] = event.name
+    return data
+
+
+@app.get("/api/warnings")
+def portfolio_warnings(db: Session = Depends(get_db), user=Depends(current_user)):
+    rows = list(db.scalars(select(Warning).join(Facility).where(Facility.owner_user_id == user.id).order_by(Warning.id)))
+    return {"warnings": [warning_payload(x, db) for x in rows], "official_feed": False,
+            "message": "Portfolio climate signals from synthetic demonstration events."}
 
 
 @app.post("/api/events/{event_id}/generate-plan")
