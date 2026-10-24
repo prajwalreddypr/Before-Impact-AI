@@ -33,8 +33,8 @@ SECRET_KEY = os.getenv("SECRET_KEY", "beforeimpact-local-demo-secret")
 UPLOAD_DIR = Path(__file__).resolve().parents[1] / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-def demo_site(site_id, name, region, lat, lon, plot, rainfall, carbon, hazards, zone, coverage, far, height, sensitivity, completeness):
-    return {"id":site_id,"name":name,"region":region,"country":"Japan","latitude":lat,"longitude":lon,
+def demo_site(site_id, name, region, lat, lon, plot, rainfall, carbon, hazards, zone, coverage, far, height, sensitivity, completeness, country="Japan"):
+    return {"id":site_id,"name":name,"region":region,"country":country,"latitude":lat,"longitude":lon,
             "plot_area_m2":plot,"site_geometry":[[0,0],[1,0],[1,.7],[.15,1]],"land_use":zone,
             "planning":{"compatibility":"Preliminarily compatible","coverage_ratio_pct":coverage,"floor_area_ratio_pct":far,
                         "height_note":height,"setback_m":3,"road_access":"6 m conceptual access road",
@@ -55,6 +55,11 @@ SITE_PRESETS = [
     demo_site("sapporo-north","Sapporo North F","Hokkaido",43.11,141.35,10800,1145,465,{"rain":39,"flood":31,"wind":58,"heat":23,"wildfire":33,"earthquake":51},"Institutional demo zone",50,120,"Snow-loading envelope not represented","Developed land near open landscape",80),
     demo_site("kobe-harbor","Kobe Harbor G","Kansai",34.68,135.19,6300,1275,409,{"rain":65,"flood":82,"wind":67,"heat":69,"wildfire":22,"earthquake":83},"Harbor-service demo zone",60,200,"Port and coastal controls unknown","Industrial brownfield concept",84),
     demo_site("kyoto-west","Kyoto West H","Kansai",35.01,135.68,8300,1490,416,{"rain":66,"flood":41,"wind":45,"heat":76,"wildfire":55,"earthquake":58},"Community demo zone",40,100,"Landscape and heritage review may apply","Vegetation corridor nearby",78),
+    demo_site("lyon-east","Lyon East Plot","Auvergne-Rhône-Alpes",45.75,4.94,7800,832,56,{"rain":46,"flood":38,"wind":34,"heat":67,"wildfire":29,"earthquake":20},"Mixed community demo zone",60,180,"Local envelope review required","Previously developed urban edge",91,"France"),
+    demo_site("nantes-loire","Nantes Loire Plot","Pays de la Loire",47.22,-1.47,9600,820,52,{"rain":55,"flood":66,"wind":58,"heat":38,"wildfire":18,"earthquake":12},"Institutional demo zone",50,150,"River-corridor review required","Developed riverside context",88,"France"),
+    demo_site("lille-south","Lille South Plot","Hauts-de-France",50.58,3.05,6400,742,49,{"rain":43,"flood":42,"wind":61,"heat":34,"wildfire":12,"earthquake":10},"Urban community demo zone",65,220,"Municipal massing review required","Brownfield regeneration concept",93,"France"),
+    demo_site("bordeaux-west","Bordeaux West Plot","Nouvelle-Aquitaine",44.84,-0.66,11200,944,54,{"rain":58,"flood":51,"wind":55,"heat":63,"wildfire":69,"earthquake":13},"Mixed-use demo zone",50,160,"Landscape and wildfire review required","Urban edge near vegetation",84,"France"),
+    demo_site("marseille-north","Marseille North Plot","Provence-Alpes-Côte d’Azur",43.36,5.37,8700,515,47,{"rain":42,"flood":48,"wind":76,"heat":82,"wildfire":84,"earthquake":18},"Community facility demo zone",45,140,"Fire-access and height review required","Dry vegetated urban fringe",86,"France"),
 ]
 
 
@@ -298,7 +303,10 @@ def search_candidate_sites(body: SiteSearchIn, user=Depends(current_user)):
     weights = {"hazard":.5,"environment":.2,"sustainability":.15,"planning":.15}
     if body.priority == "lower_environmental_impact": weights = {"hazard":.25,"environment":.5,"sustainability":.15,"planning":.1}
     if body.priority == "sustainability": weights = {"hazard":.25,"environment":.15,"sustainability":.5,"planning":.1}
-    for site in SITE_PRESETS:
+    requested_region = body.region.strip().lower()
+    candidates = [x for x in SITE_PRESETS if requested_region in {x["country"].lower(), x["region"].lower()}]
+    if not candidates: candidates = SITE_PRESETS
+    for site in candidates:
         capacity = site["plot_area_m2"] * site["planning"]["coverage_ratio_pct"] / 100
         eligible = site["plot_area_m2"] >= body.minimum_land_area_m2 and capacity >= body.building_area_m2
         hazard = round(100 - sum(site["hazards"].values()) / len(site["hazards"]))

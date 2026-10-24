@@ -34,7 +34,7 @@ def test_portfolio_has_six_major_hazards(client, auth):
 
 def test_new_construction_flow(client, auth):
     presets = client.get("/api/site-presets", headers=auth).json()["locations"]
-    assert len(presets) == 8
+    assert len(presets) == 13
     tokyo = next(x for x in presets if x["id"] == "tokyo-bay")
     site = client.post("/api/facilities", headers=auth, json={"name":"Tokyo test factory","facility_type":"factory","industry":"Construction planning","country":"Japan","address_label":"Tokyo Bay","latitude":tokyo["latitude"],"longitude":tokyo["longitude"],"timezone":"Asia/Tokyo","currency":"JPY","status":"proposed"}).json()
     blueprint = client.post(f"/api/facilities/{site['id']}/blueprints/demo", headers=auth)
@@ -52,6 +52,8 @@ def test_persistent_project_search_adaptation_and_sustainability(client, auth):
     project_id = project.json()["id"]
     search = client.post("/api/candidate-sites/search", headers=auth, json={"building_type":"School","region":"Japan","minimum_land_area_m2":5000,"building_area_m2":1800,"floors":2,"priority":"balanced"}).json()
     assert len(search["sites"]) == 8 and "weights" in search
+    france = client.post("/api/candidate-sites/search", headers=auth, json={"building_type":"School","region":"France","minimum_land_area_m2":5000,"building_area_m2":1800,"floors":2,"priority":"balanced"}).json()
+    assert len(france["sites"]) == 5 and all(x["country"] == "France" for x in france["sites"])
     selected = [search["sites"][0]["id"], search["sites"][1]["id"]]
     saved = client.patch(f"/api/construction-projects/{project_id}", headers=auth, json={"selected_site_ids":selected,"active_section":"intelligence"})
     assert saved.json()["selected_site_ids"] == selected
