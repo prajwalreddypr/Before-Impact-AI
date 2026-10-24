@@ -1,22 +1,18 @@
 # BeforeImpact AI
 
-**See the risk. Change the outcome.** BeforeImpact is a climate-resilience workspace for
-business owners and facility managers. Its signature StormTwin experience replays seeded
-weather events across an interactive 3D facility, grounds preparation actions in a reviewed
-catalogue, and compares deterministic illustrative exposure scenarios.
+**Before You Build, Understand the Impact.** BeforeImpact is a climate-resilient and sustainable construction-planning workspace. It helps communities, architects, and developers compare candidate sites, confirm blueprint geometry, test conceptual hazards and adaptations, and understand sustainability trade-offs before construction begins.
 
 ## Demo account
 
 - Email: `demo@beforeimpact.ai`
 - Password: `Demo123!`
 
-These credentials and the included data are development-only. Seeded weather, flood depths,
-warnings, and modeled outcomes are visibly labelled synthetic or illustrative.
+The included candidate plots, climate profiles, planning constraints, pollution values, and hazard contexts are fictional hackathon demo data. They are visibly labelled synthetic and are not land listings, official measurements, permissions, or engineering advice.
 
 ## Architecture
 
 - `frontend/`: Next.js, TypeScript, React Three Fiber, MapLibre, Recharts, Zustand
-- `backend/`: FastAPI, Pydantic, SQLAlchemy, Alembic, deterministic scenario model
+- `backend/`: FastAPI, Pydantic, SQLAlchemy, Alembic, ReportLab
 - PostgreSQL-ready via `DATABASE_URL`; SQLite is the zero-configuration demo fallback
 - Uploaded plans and generated PDFs are private API resources protected by ownership checks
 
@@ -44,6 +40,16 @@ npm run dev
 
 Open `http://localhost:3000`. API documentation is at `http://localhost:8000/docs`.
 
+## Primary school demo
+
+1. Sign in and create the climate-resilient community school project.
+2. Find and select two or three fictional Japanese candidate plots.
+3. Review climate, planning, and environmental Site Intelligence.
+4. Load the sample school plan, confirm dimensions, and generate the conceptual 3D school.
+5. Run a 0.8 m hypothetical flood scenario, raise the finished floor to 1.0 m, and compare before/after intersection.
+6. Switch sites without changing the building geometry.
+7. Calculate rainwater capture and embodied carbon, then export the planning report.
+
 ## Verification
 
 ```powershell
@@ -55,24 +61,6 @@ npm run typecheck
 npm run build
 ```
 
-The automated API suite covers authentication, facility access, ordered replay data,
-preparation persistence, deterministic prepared/unprepared differences, invalid blueprint
-rejection, report generation, and idempotent seeding.
+## Limits
 
-## Two-minute demo path
-
-1. Sign in with the demo account and open GreenVale Greenhouses.
-2. Open **StormTwin**, play Storm Céleste, and scrub toward the peak.
-3. Select a greenhouse in the scene and inspect its vulnerability record.
-4. Generate a preparation plan and complete at least two actions.
-5. Save and compare the scenario with no preparation.
-6. Switch the facility selector to Riverside Distribution Centre and open its inundation event.
-7. In **My Sites**, select Future Logistics Hub to review the seeded synthetic blueprint and markers.
-
-## Model and data limits
-
-The scenario engine is a reproducible educational exposure model (`exposure-1.0`), not a
-validated structural, hydrological, catastrophe-loss, safety, or insurance model. Rainfall is
-never converted into claimed local flood depth. Flood scenes use an explicit user/demo depth.
-No official warning is invented when a provider is unavailable. Proposed-site results are
-preliminary screening only and require appropriate professional review.
+Scenario graphics are conceptual exposure illustrations—not validated structural, hydrological, thermal, fire-spread, seismic-response, code-compliance, or lifecycle assessments. BeforeImpact does not replace architects, engineers, environmental consultants, permitting authorities, or official hazard assessments.

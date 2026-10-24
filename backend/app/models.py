@@ -19,6 +19,21 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
+class ConstructionProject(Base):
+    __tablename__ = "construction_projects"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(180))
+    building_type: Mapped[str] = mapped_column(String(80), default="School")
+    region: Mapped[str] = mapped_column(String(120), default="Japan")
+    entry_mode: Mapped[str] = mapped_column(String(30), default="find")
+    active_section: Mapped[str] = mapped_column(String(40), default="projects")
+    selected_site_ids_json: Mapped[list] = mapped_column(JSON, default=list)
+    project_data_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+
 class Facility(Base):
     __tablename__ = "facilities"
     id: Mapped[int] = mapped_column(primary_key=True)

@@ -34,8 +34,8 @@ def test_portfolio_has_six_major_hazards(client, auth):
 
 def test_new_construction_flow(client, auth):
     presets = client.get("/api/site-presets", headers=auth).json()["locations"]
-    assert len(presets) == 6
-    tokyo = presets[0]
+    assert len(presets) == 8
+    tokyo = next(x for x in presets if x["id"] == "tokyo-bay")
     site = client.post("/api/facilities", headers=auth, json={"name":"Tokyo test factory","facility_type":"factory","industry":"Construction planning","country":"Japan","address_label":"Tokyo Bay","latitude":tokyo["latitude"],"longitude":tokyo["longitude"],"timezone":"Asia/Tokyo","currency":"JPY","status":"proposed"}).json()
     blueprint = client.post(f"/api/facilities/{site['id']}/blueprints/demo", headers=auth)
     assert blueprint.status_code == 200
@@ -44,6 +44,25 @@ def test_new_construction_flow(client, auth):
     evaluation = client.post("/api/sites/evaluate", headers=auth, json={"preset_id":"tokyo-bay","facility_type":"Factory","roof_area_m2":model["roof_area_m2"],"simulations":{"rain":85,"wind":70}})
     assert evaluation.status_code == 200
     assert evaluation.json()["rainwater"]["annual_capture_potential_m3"] > 0
+
+
+def test_persistent_project_search_adaptation_and_sustainability(client, auth):
+    project = client.post("/api/construction-projects", headers=auth, json={"name":"Japan school demo","building_type":"School","region":"Japan","entry_mode":"find","selected_site_ids":[],"data":{"requirements":{"land":5000}}})
+    assert project.status_code == 200
+    project_id = project.json()["id"]
+    search = client.post("/api/candidate-sites/search", headers=auth, json={"building_type":"School","region":"Japan","minimum_land_area_m2":5000,"building_area_m2":1800,"floors":2,"priority":"balanced"}).json()
+    assert len(search["sites"]) == 8 and "weights" in search
+    selected = [search["sites"][0]["id"], search["sites"][1]["id"]]
+    saved = client.patch(f"/api/construction-projects/{project_id}", headers=auth, json={"selected_site_ids":selected,"active_section":"intelligence"})
+    assert saved.json()["selected_site_ids"] == selected
+    flood = client.post("/api/simulations/run", headers=auth, json={"site_id":selected[0],"hazard":"flood","intensity":0.8,"baseline_floor_m":0.2,"finished_floor_m":1.0})
+    assert flood.json()["before"]["intersects"] is True
+    assert flood.json()["after"]["intersects"] is False
+    sustainability = client.post("/api/sustainability/calculate", headers=auth, json={"site_id":selected[0],"roof_area_m2":1200,"collection_efficiency":0.8,"storage_m3":200,"concrete_t":1000,"steel_t":150,"timber_t":50,"insulation_t":20})
+    assert sustainability.json()["rainwater"]["annual_potential_m3"] > 0
+    report = client.post(f"/api/construction-projects/{project_id}/report", headers=auth)
+    assert report.status_code == 200
+    assert client.get(f"/api/reports/{report.json()['id']}/download", headers=auth).content.startswith(b"%PDF")
 
 
 def test_plan_persistence_and_scenario_difference(client, auth):
