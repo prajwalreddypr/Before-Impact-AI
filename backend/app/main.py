@@ -24,7 +24,10 @@ from .seed import DEMO_EMAIL, password_hash, seed_demo
 
 
 app = FastAPI(title="BeforeImpact AI", version="1.0.0", description="Climate resilience replay and preparation API")
-origins = [x.strip() for x in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")]
+origins = [x.strip() for x in os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000",
+).split(",")]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 SECRET_KEY = os.getenv("SECRET_KEY", "beforeimpact-local-demo-secret")
 UPLOAD_DIR = Path(__file__).resolve().parents[1] / "uploads"
