@@ -32,6 +32,20 @@ def test_portfolio_has_six_major_hazards(client, auth):
     assert all(x["is_synthetic"] for x in warnings)
 
 
+def test_new_construction_flow(client, auth):
+    presets = client.get("/api/site-presets", headers=auth).json()["locations"]
+    assert len(presets) == 6
+    tokyo = presets[0]
+    site = client.post("/api/facilities", headers=auth, json={"name":"Tokyo test factory","facility_type":"factory","industry":"Construction planning","country":"Japan","address_label":"Tokyo Bay","latitude":tokyo["latitude"],"longitude":tokyo["longitude"],"timezone":"Asia/Tokyo","currency":"JPY","status":"proposed"}).json()
+    blueprint = client.post(f"/api/facilities/{site['id']}/blueprints/demo", headers=auth)
+    assert blueprint.status_code == 200
+    model = client.post(f"/api/blueprints/{blueprint.json()['id']}/generate-model", headers=auth).json()
+    assert model["conceptual"] is True and len(model["blocks"]) >= 3
+    evaluation = client.post("/api/sites/evaluate", headers=auth, json={"preset_id":"tokyo-bay","facility_type":"Factory","roof_area_m2":model["roof_area_m2"],"simulations":{"rain":85,"wind":70}})
+    assert evaluation.status_code == 200
+    assert evaluation.json()["rainwater"]["annual_capture_potential_m3"] > 0
+
+
 def test_plan_persistence_and_scenario_difference(client, auth):
     facility = client.get("/api/facilities", headers=auth).json()[0]
     event = client.get(f"/api/facilities/{facility['id']}/events", headers=auth).json()[0]

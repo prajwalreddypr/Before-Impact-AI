@@ -10,3 +10,7 @@ export type ScenarioResult = { exposure_score:number; potential_loss_range:numbe
 export type Scenario = { id:number; name:string; scenario_type:string; created_at:string; result:ScenarioResult };
 export type Report = { id:number; title:string; report_type:string; created_at:string; facility_id:number };
 export type Warning = { id:number; facility_id:number; weather_event_id:number; hazard_type:string; severity:string; title:string; facility_name:string; country:string; event_name:string; valid_from:string; valid_to:string; is_synthetic:boolean };
+export type SitePreset = { id:string; name:string; region:string; latitude:number; longitude:number; annual_rainfall_mm:number; grid_carbon_gco2_kwh:number; rainwater_score:number; hazards:Record<string,number> };
+export type ModelBlock = { id:string; label:string; x:number; z:number; width:number; depth:number; height:number };
+export type ConceptModel = { model_version:string; source_blueprint_id:number; conceptual:boolean; footprint_m:{width:number;depth:number}; roof_area_m2:number; blocks:ModelBlock[]; limitations:string };
+export type SiteEvaluation = { decision:string; hazard_scores:Record<string,number>; highest_hazards:{hazard:string;score:number;action:string}[]; carbon:{embodied_range_tco2e:number[];grid_intensity_gco2_kwh:number}; rainwater:{annual_capture_potential_m3:number;score:number}; limitations:string };

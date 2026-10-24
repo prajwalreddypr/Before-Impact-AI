@@ -33,6 +33,15 @@ SECRET_KEY = os.getenv("SECRET_KEY", "beforeimpact-local-demo-secret")
 UPLOAD_DIR = Path(__file__).resolve().parents[1] / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+SITE_PRESETS = [
+    {"id":"tokyo-bay","name":"Tokyo Bay","region":"Kanto","latitude":35.58,"longitude":139.78,"annual_rainfall_mm":1598,"grid_carbon_gco2_kwh":438,"rainwater_score":82,"hazards":{"wind":68,"rain":76,"flood":72,"heat":64,"wildfire":24,"drought":31}},
+    {"id":"osaka-coast","name":"Osaka Coast","region":"Kansai","latitude":34.64,"longitude":135.40,"annual_rainfall_mm":1338,"grid_carbon_gco2_kwh":412,"rainwater_score":74,"hazards":{"wind":63,"rain":69,"flood":70,"heat":71,"wildfire":29,"drought":38}},
+    {"id":"sendai-port","name":"Sendai Port","region":"Tohoku","latitude":38.27,"longitude":141.02,"annual_rainfall_mm":1254,"grid_carbon_gco2_kwh":401,"rainwater_score":68,"hazards":{"wind":72,"rain":61,"flood":66,"heat":42,"wildfire":28,"drought":25}},
+    {"id":"nagoya-east","name":"Nagoya East","region":"Chubu","latitude":35.14,"longitude":137.05,"annual_rainfall_mm":1578,"grid_carbon_gco2_kwh":420,"rainwater_score":80,"hazards":{"wind":65,"rain":72,"flood":48,"heat":68,"wildfire":34,"drought":39}},
+    {"id":"sapporo-north","name":"Sapporo North","region":"Hokkaido","latitude":43.12,"longitude":141.35,"annual_rainfall_mm":1146,"grid_carbon_gco2_kwh":465,"rainwater_score":62,"hazards":{"wind":58,"rain":42,"flood":35,"heat":28,"wildfire":32,"drought":22}},
+    {"id":"fukuoka-hakata","name":"Fukuoka Hakata","region":"Kyushu","latitude":33.59,"longitude":130.45,"annual_rainfall_mm":1687,"grid_carbon_gco2_kwh":451,"rainwater_score":86,"hazards":{"wind":74,"rain":82,"flood":59,"heat":73,"wildfire":36,"drought":42}},
+]
+
 
 @app.on_event("startup")
 def startup():
@@ -150,9 +159,22 @@ class ReportIn(BaseModel):
     title: str = "Climate resilience scenario report"
 
 
+class SiteEvaluationIn(BaseModel):
+    preset_id: str
+    facility_type: str
+    roof_area_m2: float = Field(default=2400, ge=50, le=200000)
+    simulations: Dict[str, int] = {}
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "service": "BeforeImpact AI", "model_version": "exposure-1.0"}
+
+
+@app.get("/api/site-presets")
+def site_presets(user=Depends(current_user)):
+    return {"locations": SITE_PRESETS, "synthetic": True,
+            "notice": "Synthetic planning dataset for product demonstration; validate with authoritative local sources."}
 
 
 @app.post("/api/auth/login")
@@ -409,6 +431,18 @@ def facility_blueprints(facility_id: int, db: Session = Depends(get_db), user=De
     return [as_dict(x) for x in db.scalars(select(Blueprint).where(Blueprint.facility_id == facility_id).order_by(Blueprint.id.desc()))]
 
 
+@app.post("/api/facilities/{facility_id}/blueprints/demo")
+def use_demo_blueprint(facility_id: int, db: Session = Depends(get_db), user=Depends(current_user)):
+    owned_facility(db, user, facility_id)
+    source = db.scalar(select(Blueprint).where(Blueprint.mime_type == "image/svg+xml").order_by(Blueprint.id))
+    if not source or not Path(source.storage_path).exists():
+        raise HTTPException(404, "Demo plan is unavailable")
+    row = Blueprint(facility_id=facility_id, filename="concept-factory-plan.svg", storage_path=source.storage_path,
+                    mime_type="image/svg+xml", processing_status="ready", extracted_data_json={"synthetic": True})
+    db.add(row); db.commit(); db.refresh(row)
+    return as_dict(row)
+
+
 @app.get("/api/blueprints/{blueprint_id}")
 def blueprint(blueprint_id: int, db: Session = Depends(get_db), user=Depends(current_user)):
     row = db.get(Blueprint, blueprint_id)
@@ -421,6 +455,31 @@ def blueprint_preview(blueprint_id: int, db: Session = Depends(get_db), user=Dep
     row = db.get(Blueprint, blueprint_id)
     if not row: raise HTTPException(404, "Blueprint not found")
     owned_facility(db, user, row.facility_id); return FileResponse(row.storage_path, media_type=row.mime_type)
+
+
+@app.post("/api/blueprints/{blueprint_id}/generate-model")
+def generate_concept_model(blueprint_id: int, db: Session = Depends(get_db), user=Depends(current_user)):
+    row = db.get(Blueprint, blueprint_id)
+    if not row: raise HTTPException(404, "Blueprint not found")
+    owned_facility(db, user, row.facility_id)
+    markers = list(db.scalars(select(BlueprintMarker).where(BlueprintMarker.blueprint_id == row.id)))
+    if markers:
+        blocks = [{"id": f"marker-{m.id}", "label": m.label, "x": round((m.normalized_x-.5)*24, 2),
+                   "z": round((m.normalized_y-.5)*16, 2), "width": 4.2, "depth": 3.6,
+                   "height": 2.8 + (m.id % 3)} for m in markers]
+    else:
+        blocks = [
+            {"id":"main-hall","label":"Main hall","x":-2,"z":0,"width":15,"depth":9,"height":5},
+            {"id":"utilities","label":"Utilities","x":8,"z":-2,"width":4,"depth":5,"height":3.5},
+            {"id":"storage","label":"Storage","x":7,"z":5,"width":6,"depth":4,"height":3},
+            {"id":"office","label":"Office","x":-7,"z":6,"width":5,"depth":3,"height":2.5},
+        ]
+    model = {"model_version":"plan-concept-1.0", "source_blueprint_id":row.id, "conceptual":True,
+             "footprint_m":{"width":32,"depth":22}, "roof_area_m2":2450, "blocks":blocks,
+             "limitations":"Conceptual extrusion from the uploaded plan; dimensions require user and professional validation."}
+    row.extracted_data_json = {**(row.extracted_data_json or {}), "model": model}
+    row.processing_status = "model_ready"; db.commit()
+    return model
 
 
 @app.post("/api/blueprints/{blueprint_id}/markers")
@@ -456,6 +515,29 @@ def screen_site(body: FacilityIn, user=Depends(current_user)):
 @app.post("/api/sites/compare")
 def compare_sites(payload: Dict[str, Any], user=Depends(current_user)):
     return {"configurations": payload, "conclusion": "Differences reflect user-selected conceptual measures only.", "professional_review_required": True}
+
+
+@app.post("/api/sites/evaluate")
+def evaluate_site(body: SiteEvaluationIn, user=Depends(current_user)):
+    preset = next((x for x in SITE_PRESETS if x["id"] == body.preset_id), None)
+    if not preset: raise HTTPException(404, "Planning location not found")
+    simulations = {k: max(0, min(100, int(v))) for k, v in body.simulations.items()}
+    combined = {k: round(preset["hazards"].get(k, 0) * .55 + simulations.get(k, 50) * .45) for k in preset["hazards"]}
+    highest = sorted(combined.items(), key=lambda x: x[1], reverse=True)
+    max_score = highest[0][1]
+    decision = "conditional" if max_score >= 67 else "review" if max_score >= 40 else "favourable"
+    harvest_m3 = round(preset["annual_rainfall_mm"] / 1000 * body.roof_area_m2 * .8)
+    carbon_low = round(body.roof_area_m2 * 0.42)
+    actions = {
+        "wind":"Obtain structural wind-load review", "rain":"Size roof drainage against local design rainfall",
+        "flood":"Validate finished-floor level and evacuation access", "heat":"Model cooling loads and shaded operations",
+        "wildfire":"Review defensible space and smoke filtration", "drought":"Prepare a water-efficiency and reuse plan",
+    }
+    return {"preset":preset, "facility_type":body.facility_type, "hazard_scores":combined,
+            "decision":decision, "highest_hazards":[{"hazard":k,"score":v,"action":actions[k]} for k,v in highest[:3]],
+            "carbon":{"embodied_range_tco2e":[carbon_low,round(carbon_low*1.45)],"grid_intensity_gco2_kwh":preset["grid_carbon_gco2_kwh"]},
+            "rainwater":{"annual_capture_potential_m3":harvest_m3,"score":preset["rainwater_score"]},
+            "limitations":"Synthetic preliminary screening. Not a planning, engineering, carbon-accounting, or hazard certification."}
 
 
 @app.post("/api/reports")
