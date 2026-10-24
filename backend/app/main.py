@@ -117,8 +117,9 @@ class AssetPatch(BaseModel):
 
 
 class PlanItemPatch(BaseModel):
-    status: str
+    status: Optional[str] = None
     user_notes: str = ""
+    assignee_name: Optional[str] = None
 
 
 class ScenarioIn(BaseModel):
@@ -328,9 +329,13 @@ def update_plan_item(plan_id: int, item_id: int, body: PlanItemPatch, db: Sessio
     owned_facility(db, user, plan.facility_id)
     item = db.get(PlanItem, item_id)
     if not item or item.plan_id != plan_id: raise HTTPException(404, "Plan item not found")
-    if body.status not in ("suggested", "planned", "completed", "not_applicable"): raise HTTPException(422, "Invalid status")
-    item.status = body.status; item.user_notes = body.user_notes
-    item.completion_timestamp = datetime.now(timezone.utc) if body.status == "completed" else None
+    if body.status is not None:
+        if body.status not in ("suggested", "planned", "completed", "not_applicable"): raise HTTPException(422, "Invalid status")
+        item.status = body.status
+        item.completion_timestamp = datetime.now(timezone.utc) if body.status == "completed" else None
+    if body.assignee_name is not None:
+        item.assignee_name = body.assignee_name[:120]
+    item.user_notes = body.user_notes
     db.commit(); return as_dict(item)
 
 

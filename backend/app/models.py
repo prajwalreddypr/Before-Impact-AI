@@ -142,6 +142,7 @@ class PlanItem(Base):
     status: Mapped[str] = mapped_column(String(30), default="suggested")
     completion_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     user_notes: Mapped[str] = mapped_column(Text, default="")
+    assignee_name: Mapped[str] = mapped_column(String(120), default="Unassigned")
 
 
 class Scenario(Base):

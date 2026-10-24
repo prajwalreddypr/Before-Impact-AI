@@ -37,8 +37,9 @@ def test_plan_persistence_and_scenario_difference(client, auth):
     event = client.get(f"/api/facilities/{facility['id']}/events", headers=auth).json()[0]
     plan = client.post(f"/api/events/{event['id']}/generate-plan", headers=auth).json()
     first = plan["items"][0]
-    updated = client.patch(f"/api/plans/{plan['id']}/items/{first['id']}", headers=auth, json={"status":"completed","user_notes":"test"})
+    updated = client.patch(f"/api/plans/{plan['id']}/items/{first['id']}", headers=auth, json={"status":"completed","user_notes":"test","assignee_name":"Site lead"})
     assert updated.json()["status"] == "completed"
+    assert updated.json()["assignee_name"] == "Site lead"
     base = client.post("/api/scenarios", headers=auth, json={"facility_id":facility["id"],"weather_event_id":event["id"],"name":"No prep test","scenario_type":"unprepared","selected_action_ids":[]}).json()
     prepared = client.post("/api/scenarios", headers=auth, json={"facility_id":facility["id"],"weather_event_id":event["id"],"name":"Prepared test","scenario_type":"prepared","selected_action_ids":[first["action"]["id"], plan["items"][1]["action"]["id"]]}).json()
     assert prepared["result"]["exposure_score"] < base["result"]["exposure_score"]
