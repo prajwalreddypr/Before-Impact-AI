@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: beforeimpact
+      POSTGRES_USER: beforeimpact
+      POSTGRES_PASSWORD: beforeimpact
+    ports:
+      - "5432:5432"
+    volumes:
+      - beforeimpact_pg:/var/lib/postgresql/data
+
+volumes:
+  beforeimpact_pg:

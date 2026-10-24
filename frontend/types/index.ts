@@ -1,0 +1,11 @@
+export type Facility = { id:number; name:string; facility_type:string; industry:string; country:string; address_label:string; latitude:number; longitude:number; timezone:string; currency:string; status:string };
+export type Asset = { id:number; facility_id:number; name:string; asset_type:string; description:string; value_amount:number; currency:string; relative_x:number; relative_y:number; relative_z:number; dimensions_json:Record<string,number>; vulnerability_profile_json:Record<string,string>; preparedness_status:string };
+export type Event = { id:number; facility_id:number; name:string; hazard_type:string; event_mode:string; start_at:string; peak_at:string; end_at:string; provider:string; source_url:string; is_synthetic:boolean; scenario_depth_m:number };
+export type Reading = { id:number; timestamp:string; wind_speed_kmh:number; wind_gust_kmh:number; wind_direction_deg:number; rainfall_mm:number; temperature_c:number; apparent_temperature_c:number; relative_humidity:number; source_type:string };
+export type TimelineData = { event:Event; readings:Reading[]; source:{provider:string;synthetic:boolean;url:string} };
+export type PlanAction = { id:number; title:string; description:string; rationale:string; estimated_minutes:number; priority:string; professional_review:boolean; references_json:{title:string;url:string}[] };
+export type PlanItem = { id:number; status:string; user_notes:string; action:PlanAction };
+export type Plan = { id:number; summary:string; generated_by:string; items:PlanItem[] };
+export type ScenarioResult = { exposure_score:number; potential_loss_range:number[]; protection_modifier:number; actions_applied:number; illustrative:boolean; limitations:string };
+export type Scenario = { id:number; name:string; scenario_type:string; created_at:string; result:ScenarioResult };
+export type Report = { id:number; title:string; report_type:string; created_at:string; facility_id:number };
