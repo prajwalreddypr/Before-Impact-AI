@@ -1,4 +1,6 @@
+import base64
 import hashlib
+import json
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -6,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import jwt
+import httpx
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -629,6 +632,70 @@ def blueprint_preview(blueprint_id: int, db: Session = Depends(get_db), user=Dep
     row = db.get(Blueprint, blueprint_id)
     if not row: raise HTTPException(404, "Blueprint not found")
     owned_facility(db, user, row.facility_id); return FileResponse(row.storage_path, media_type=row.mime_type)
+
+
+def demo_blueprint_analysis(row, building_type):
+    plan_type = (row.extracted_data_json or {}).get("plan_type") or building_type.lower()
+    presets = {
+        "residential": (16, 12, 2, 3.0, ["Living room", "Kitchen", "Bedroom", "Bathroom", "Service core"]),
+        "factory": (52, 34, 1, 7.0, ["Production hall", "Utilities", "Loading area", "Office"]),
+        "school": (42, 28, 2, 3.6, ["Classroom wing", "Community hall", "Administration", "Services"]),
+        "commercial building": (38, 26, 3, 3.8, ["Retail floor", "Shared lobby", "Office zone", "Service core"]),
+    }
+    key = "residential" if "residential" in plan_type or "house" in plan_type else "factory" if "factory" in plan_type else "school" if "school" in plan_type else "commercial building"
+    width, depth, floors, floor_height, names = presets[key]
+    area = round(width * depth / max(1, len(names)), 1)
+    return {"analysis_mode":"demo_fallback","summary":f"Conceptual {building_type.lower()} plan with {len(names)} identifiable planning zones.","building_type":building_type,
+            "dimensions":{"width_m":width,"depth_m":depth,"floors":floors,"floor_height_m":floor_height},
+            "rooms":[{"name":name,"approximate_area_m2":area,"floor":1 if i < 3 else min(2, floors),"confidence":.62} for i,name in enumerate(names)],
+            "detected_labels":names,"assumptions":["Dimensions use the selected building-type demo profile.","Room areas are approximate and require confirmation."],
+            "uncertainties":["OPENAI_API_KEY is not configured, so visual plan interpretation was not performed.","Wall thicknesses, doors, structure and scale are not verified."],"overall_confidence":.45}
+
+
+BLUEPRINT_ANALYSIS_SCHEMA = {"type":"object","additionalProperties":False,"required":["analysis_mode","summary","building_type","dimensions","rooms","detected_labels","assumptions","uncertainties","overall_confidence"],"properties":{
+    "analysis_mode":{"type":"string","enum":["ai_vision"]},"summary":{"type":"string"},"building_type":{"type":"string"},
+    "dimensions":{"type":"object","additionalProperties":False,"required":["width_m","depth_m","floors","floor_height_m"],"properties":{"width_m":{"type":"number"},"depth_m":{"type":"number"},"floors":{"type":"integer"},"floor_height_m":{"type":"number"}}},
+    "rooms":{"type":"array","items":{"type":"object","additionalProperties":False,"required":["name","approximate_area_m2","floor","confidence"],"properties":{"name":{"type":"string"},"approximate_area_m2":{"type":"number"},"floor":{"type":"integer"},"confidence":{"type":"number"}}}},
+    "detected_labels":{"type":"array","items":{"type":"string"}},"assumptions":{"type":"array","items":{"type":"string"}},"uncertainties":{"type":"array","items":{"type":"string"}},"overall_confidence":{"type":"number"}}}
+
+
+@app.post("/api/blueprints/{blueprint_id}/analyze")
+def analyze_blueprint(blueprint_id: int, building_type: str = "Commercial building", db: Session = Depends(get_db), user=Depends(current_user)):
+    row = db.get(Blueprint, blueprint_id)
+    if not row: raise HTTPException(404, "Blueprint not found")
+    owned_facility(db, user, row.facility_id)
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    analysis = None
+    if api_key and row.mime_type in {"application/pdf", "image/png", "image/jpeg"}:
+        encoded = base64.b64encode(Path(row.storage_path).read_bytes()).decode("ascii")
+        if row.mime_type == "application/pdf":
+            file_part = {"type":"input_file","filename":row.filename,"file_data":f"data:application/pdf;base64,{encoded}","detail":"high"}
+        else:
+            file_part = {"type":"input_image","image_url":f"data:{row.mime_type};base64,{encoded}","detail":"high"}
+        prompt = f"Analyze this architectural blueprint for a proposed {building_type}. Identify only information visible or reasonably inferable from the drawing. Extract the exterior footprint, likely floor count, labelled rooms or functional zones, and dimensions. Never claim code compliance or engineering validity. Use conservative confidence values, put missing or ambiguous details in uncertainties, and return empty arrays when nothing is readable."
+        payload = {"model":os.getenv("OPENAI_BLUEPRINT_MODEL", "gpt-6-astra"),"input":[{"role":"user","content":[file_part,{"type":"input_text","text":prompt}]}],"text":{"format":{"type":"json_schema","name":"blueprint_analysis","strict":True,"schema":BLUEPRINT_ANALYSIS_SCHEMA}},"max_output_tokens":2500}
+        try:
+            response = httpx.post("https://api.openai.com/v1/responses",headers={"Authorization":f"Bearer {api_key}","Content-Type":"application/json"},json=payload,timeout=90)
+            response.raise_for_status()
+            data = response.json(); output_text = next((part.get("text") for item in data.get("output",[]) if item.get("type")=="message" for part in item.get("content",[]) if part.get("type")=="output_text"),None)
+            if output_text: analysis = json.loads(output_text)
+        except Exception as exc:
+            analysis = demo_blueprint_analysis(row, building_type)
+            analysis["uncertainties"][0] = f"AI vision was unavailable for this scan ({type(exc).__name__}); demo extraction was used."
+    if analysis is None: analysis = demo_blueprint_analysis(row, building_type)
+    dimensions = analysis["dimensions"]
+    dimensions["width_m"] = max(4, min(500, float(dimensions["width_m"])))
+    dimensions["depth_m"] = max(4, min(500, float(dimensions["depth_m"])))
+    dimensions["floors"] = max(1, min(80, int(dimensions["floors"])))
+    dimensions["floor_height_m"] = max(2, min(12, float(dimensions["floor_height_m"])))
+    analysis["overall_confidence"] = max(0, min(1, float(analysis["overall_confidence"])))
+    for room in analysis["rooms"]:
+        room["approximate_area_m2"] = max(0, float(room["approximate_area_m2"]))
+        room["floor"] = max(1, min(dimensions["floors"], int(room["floor"])))
+        room["confidence"] = max(0, min(1, float(room["confidence"])))
+    row.extracted_data_json = {**(row.extracted_data_json or {}),"blueprint_analysis":analysis}
+    row.processing_status = "analysis_ready"; db.commit(); db.refresh(row)
+    return analysis
 
 
 @app.post("/api/blueprints/{blueprint_id}/generate-model")

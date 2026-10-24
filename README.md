@@ -16,6 +16,12 @@ The included candidate plots, climate profiles, planning constraints, pollution 
 - PostgreSQL-ready via `DATABASE_URL`; SQLite is the zero-configuration demo fallback
 - Uploaded plans and generated PDFs are private API resources protected by ownership checks
 
+## Blueprint understanding
+
+After a PDF, PNG, or JPEG plan is uploaded, BeforeImpact scans it into a strict structured result: footprint dimensions, floor count, room/zone labels, approximate areas, confidence, assumptions, and uncertainties. The user must review or correct those findings before the conceptual 3D model is generated.
+
+Set `OPENAI_API_KEY` to enable multimodal analysis through the OpenAI Responses API. `OPENAI_BLUEPRINT_MODEL` controls the vision-capable model and defaults to `gpt-6-astra`. Without a key—or if analysis is unavailable—the UI clearly identifies the result as **Demo Extraction** and uses a deterministic building-type profile instead of claiming that AI inspected the drawing.
+
 ## Run locally
 
 Requirements: Node 20+, Python 3.9+ (3.12 recommended).
