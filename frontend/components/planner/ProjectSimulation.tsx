@@ -25,7 +25,7 @@ function FireField({distance}:{distance:number}){
   return <group ref={group}>{Array.from({length:amount},(_,i)=><mesh key={i} position={[-16+(i*3.8)%32,.35,12-(i%3)*2]}><coneGeometry args={[.3+.2*(i%2),.9+(i%3)*.3,8]}/><meshBasicMaterial color={i%2?"#ffb33c":"#e84f37"}/></mesh>)}</group>
 }
 
-type SceneProps={model:ConceptModel;hazard:string;intensity:number;floorElevation:number;orientation:number;offset:[number,number];playing:boolean;autoRotate:boolean};
+type SceneProps={model:ConceptModel;hazard:string;intensity:number;floorElevation:number;orientation:number;offset:[number,number];playing:boolean;autoRotate:boolean;equipmentElevation?:number;showPlatform?:boolean};
 
 function Building({model,hazard,intensity,floorElevation,orientation,offset,playing}:SceneProps){
   const ref=useRef<THREE.Group>(null);
@@ -34,20 +34,24 @@ function Building({model,hazard,intensity,floorElevation,orientation,offset,play
 }
 
 function Scene(props:SceneProps){
+  const extent=Math.max(34,props.model.footprint_m.width,props.model.footprint_m.depth);
   const {hazard,intensity,playing,autoRotate}=props,wet=hazard==="rain"||hazard==="flood",water=hazard==="flood"?intensity:0;
   return <>
     <color attach="background" args={[hazard==="wildfire"?"#c7674c":hazard==="heat"?"#efbd68":wet?"#62676e":"#e7b18b"]}/>
-    <fog attach="fog" args={[hazard==="wildfire"?"#b45b45":wet?"#62676e":"#e7b18b",30,62]}/>
+    <fog attach="fog" args={[hazard==="wildfire"?"#b45b45":wet?"#62676e":"#e7b18b",extent*.7,extent*3]}/>
     <ambientLight intensity={wet ? .7 : 1.2}/>
     <directionalLight position={[10,18,8]} intensity={hazard==="heat"?2.8:1.8} color={hazard==="heat"?"#ffd07c":"#fff5df"}/>
-    <OrbitControls makeDefault enableDamping autoRotate={autoRotate} autoRotateSpeed={1.15} minDistance={9} maxDistance={58} maxPolarAngle={Math.PI/2.05}/>
-    <mesh rotation={[-Math.PI/2,0,0]}><planeGeometry args={[72,52]}/><meshStandardMaterial color={wet?"#706861":"#c98f62"}/></mesh>
-    <Grid args={[50,38]} position={[0,.02,0]} cellColor="#e9bf99" sectionColor="#8a6250"/>
+    <OrbitControls makeDefault enableDamping autoRotate={autoRotate} autoRotateSpeed={1.15} minDistance={9} maxDistance={extent*3} target={[0,2,0]} maxPolarAngle={Math.PI/2.05}/>
+    <mesh rotation={[-Math.PI/2,0,0]}><planeGeometry args={[extent*2.5,extent*2.5]}/><meshStandardMaterial color={wet?"#706861":"#c98f62"}/></mesh>
+    <Grid args={[extent*2,extent*2]} position={[0,.02,0]} cellColor="#e9bf99" sectionColor="#8a6250"/>
+    {props.showPlatform&&props.floorElevation>0&&<mesh position={[props.offset[0],props.floorElevation/2,props.offset[1]]} rotation={[0,props.orientation*Math.PI/180,0]}><boxGeometry args={[props.model.footprint_m.width+.8,props.floorElevation,props.model.footprint_m.depth+.8]}/><meshStandardMaterial color="#d7d1bf"/></mesh>}
     <Building {...props}/>
-    {hazard==="rain"&&playing&&<Rain amount={intensity}/>} {hazard==="wind"&&playing&&<Wind amount={intensity}/>} {hazard==="wildfire"&&<FireField distance={intensity}/>} {water>0&&<mesh position={[0,water,0]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[50,38]}/><meshPhysicalMaterial color="#3f9dcc" transparent opacity={.52} transmission={.3}/></mesh>} {hazard==="heat"&&<pointLight position={[0,12,0]} intensity={Math.max(1,intensity/12)} color="#ff9e43"/>}
+    {props.equipmentElevation!==undefined&&<group position={[props.model.footprint_m.width/2+2,0,0]}><mesh position={[0,props.equipmentElevation+.6,0]}><boxGeometry args={[1.4,1.2,1.2]}/><meshStandardMaterial color="#f1d17d"/></mesh>{props.equipmentElevation>0&&<mesh position={[0,props.equipmentElevation/2,0]}><boxGeometry args={[.6,props.equipmentElevation,.6]}/><meshStandardMaterial color="#524c42"/></mesh>}</group>}
+    {hazard==="rain"&&playing&&<Rain amount={intensity}/>} {hazard==="wind"&&playing&&<Wind amount={intensity}/>} {hazard==="wildfire"&&<FireField distance={intensity}/>} {water>0&&<mesh position={[0,water,0]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[extent*2,extent*2]}/><meshPhysicalMaterial color="#3f9dcc" transparent opacity={.52} transmission={.3}/></mesh>} {hazard==="heat"&&<pointLight position={[0,12,0]} intensity={Math.max(1,intensity/12)} color="#ff9e43"/>}
   </>
 }
 
-export function ProjectSimulation({model,hazard,intensity,floorElevation=0,orientation=0,offset=[0,0],playing=true,autoRotate=false}:{model:ConceptModel;hazard:string;intensity:number;floorElevation?:number;orientation?:number;offset?:[number,number];playing?:boolean;autoRotate?:boolean}){
-  return <Canvas shadows dpr={[1,1.5]} camera={{position:[24,18,26],fov:45}}><Scene model={model} hazard={hazard} intensity={intensity} floorElevation={floorElevation} orientation={orientation} offset={offset} playing={playing} autoRotate={autoRotate}/></Canvas>
+export function ProjectSimulation({model,hazard,intensity,floorElevation=0,orientation=0,offset=[0,0],playing=true,autoRotate=false,equipmentElevation,showPlatform=false}:{model:ConceptModel;hazard:string;intensity:number;floorElevation?:number;orientation?:number;offset?:[number,number];playing?:boolean;autoRotate?:boolean;equipmentElevation?:number;showPlatform?:boolean}){
+  const extent=Math.max(24,model.footprint_m.width,model.footprint_m.depth);
+  return <Canvas shadows dpr={[1,1.5]} camera={{position:[extent*.95,extent*.7,extent*1.15],fov:45,far:extent*10}}><Scene model={model} hazard={hazard} intensity={intensity} floorElevation={floorElevation} orientation={orientation} offset={offset} playing={playing} autoRotate={autoRotate} equipmentElevation={equipmentElevation} showPlatform={showPlatform}/></Canvas>
 }

@@ -10,7 +10,8 @@ export async function api<T>(path:string, init:RequestInit = {}):Promise<T> {
   const response = await fetch(`${BASE}${path}`, {...init, headers, cache:"no-store"});
   if (!response.ok) {
     const body = await response.json().catch(() => ({detail:"Request failed"}));
-    throw new Error(body.detail || "Request failed");
+    const detail = Array.isArray(body.detail) ? body.detail.map((issue:{msg?:string}) => issue.msg || "Invalid input").join("; ") : body.detail;
+    throw new Error(typeof detail === "string" ? detail : "Request failed");
   }
   return response.json();
 }

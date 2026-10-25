@@ -23,6 +23,8 @@ from .models import (Asset, Blueprint, BlueprintMarker, ConstructionProject, Fac
                      PreparationAction, PreparationPlan, Report, Scenario,
                      ScenarioResult, User, Warning, WeatherEvent, WeatherReading)
 from .scenario import calculate_exposure
+from .resilience import ApplyOption, ResilienceInput, geometry_fingerprint, solve as solve_resilience
+from .studio import register_studio_routes
 from .seed import DEMO_EMAIL, password_hash, seed_demo
 
 
@@ -33,8 +35,8 @@ origins = [x.strip() for x in os.getenv(
 ).split(",")]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 SECRET_KEY = os.getenv("SECRET_KEY", "beforeimpact-local-demo-secret")
-UPLOAD_DIR = Path(__file__).resolve().parents[1] / "uploads"
-UPLOAD_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", str(Path(__file__).resolve().parents[1] / "uploads")))
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 def demo_site(site_id, name, region, lat, lon, plot, rainfall, carbon, hazards, zone, coverage, far, height, sensitivity, completeness, country="Japan"):
     return {"id":site_id,"name":name,"region":region,"country":country,"latitude":lat,"longitude":lon,
@@ -298,6 +300,76 @@ def update_construction_project(project_id: int, body: ConstructionProjectPatch,
     for key, value in values.items(): setattr(row, key, value)
     row.updated_at = datetime.now(timezone.utc); db.commit(); db.refresh(row)
     return project_payload(row)
+
+
+def resilience_context(project_id, blueprint_id, db, user):
+    project = db.get(ConstructionProject, project_id)
+    if not project or project.owner_user_id != user.id:
+        raise HTTPException(404, "Project not found")
+    bp = db.get(Blueprint, blueprint_id)
+    if not bp:
+        raise HTTPException(404, "Blueprint not found")
+    owned_facility(db, user, bp.facility_id)
+    data = project.project_data_json or {}
+    if data.get("facility_id") != bp.facility_id or (data.get("blueprint") or {}).get("id") != bp.id:
+        raise HTTPException(422, "Save this project's selected blueprint before comparing designs")
+    geometry = (bp.extracted_data_json or {}).get("confirmed_geometry")
+    if not geometry:
+        raise HTTPException(422, "Confirm blueprint geometry before comparing designs")
+    model = data.get("model")
+    if model and (model.get("source_blueprint_id") != bp.id or
+                  (model.get("footprint_m") or {}) != {"width": geometry["width_m"], "depth": geometry["depth_m"]}):
+        raise HTTPException(409, "Regenerate the conceptual model for the current blueprint geometry")
+    return project, geometry
+
+
+register_studio_routes(app, get_db, current_user, resilience_context, project_payload)
+
+
+@app.post("/api/construction-projects/{project_id}/resilience/solve")
+def compare_resilience(project_id: int, body: ResilienceInput, db: Session = Depends(get_db), user=Depends(current_user)):
+    project, geometry = resilience_context(project_id, body.blueprint_id, db, user)
+    study = {"id": secrets.token_hex(12), "created_at": datetime.now(timezone.utc).isoformat(),
+             "input": body.model_dump(), "result": solve_resilience(body, geometry), "applied_option_id": None}
+    project.project_data_json = {**(project.project_data_json or {}), "resilience": study}
+    project.active_section = "resilience"
+    project.updated_at = datetime.now(timezone.utc)
+    db.commit(); db.refresh(project)
+    return project_payload(project)
+
+
+@app.post("/api/construction-projects/{project_id}/resilience/apply")
+def apply_resilience(project_id: int, body: ApplyOption, db: Session = Depends(get_db), user=Depends(current_user)):
+    project = db.get(ConstructionProject, project_id)
+    if not project or project.owner_user_id != user.id:
+        raise HTTPException(404, "Project not found")
+    data = project.project_data_json or {}
+    study = data.get("resilience") or {}
+    if study.get("id") != body.study_id:
+        raise HTTPException(409, "This comparison has changed. Compare designs again.")
+    try:
+        inputs = ResilienceInput.model_validate(study["input"])
+    except (ValueError, KeyError, TypeError):
+        raise HTTPException(422, "Comparison inputs are incomplete. Compare designs again.")
+    project, geometry = resilience_context(project_id, inputs.blueprint_id, db, user)
+    if geometry_fingerprint(geometry) != (study.get("result") or {}).get("geometry_fingerprint"):
+        raise HTTPException(409, "Blueprint geometry has changed. Compare designs again.")
+    # Recalculate instead of trusting client-editable JSON or submitted prices.
+    result = solve_resilience(inputs, geometry)
+    option = next((x for x in result["options"] if x["id"] == body.option_id), None)
+    if not option:
+        raise HTTPException(422, "This option does not meet the saved constraints")
+    project.project_data_json = {
+        **data, "resilience": {**study, "result": result, "applied_option_id": option["id"]},
+        "resilience_applied": {"study_id": study["id"], "input": inputs.model_dump(), "option": option,
+                               "geometry_fingerprint": result["geometry_fingerprint"]},
+        "adaptations": {**data.get("adaptations", {}), "baseline_floor_m": inputs.baseline_floor_m,
+                        "finished_floor_m": option["floor_m"], "equipment_level_m": option["equipment_m"]},
+        "hazard": "flood", "hazard_values": {**data.get("hazard_values", {}), "flood": inputs.water_level_m},
+    }
+    project.updated_at = datetime.now(timezone.utc)
+    db.commit(); db.refresh(project)
+    return project_payload(project)
 
 
 @app.post("/api/candidate-sites/search")
@@ -824,14 +896,15 @@ def create_project_report(project_id: int, db: Session = Depends(get_db), user=D
     facility_id = (project.project_data_json or {}).get("facility_id")
     facility = db.get(Facility, facility_id) if facility_id else db.scalar(select(Facility).where(Facility.owner_user_id == user.id))
     if not facility: raise HTTPException(422, "Project needs a linked planning site")
+    owned_facility(db, user, facility.id)
     row = Report(user_id=user.id, facility_id=facility.id, report_type="construction_planning", title=f"{project.name} planning report")
     db.add(row); db.flush(); path = UPLOAD_DIR / f"project-report-{row.id}.pdf"
     pdf = canvas.Canvas(str(path), pagesize=A4); width, height = A4; y = height-52
     def line(text, bold=False, gap=17):
         nonlocal y
-        if y < 65: pdf.showPage(); y = height-52
-        pdf.setFont("Helvetica-Bold" if bold else "Helvetica", 11 if bold else 9)
         for segment in [str(text)[i:i+96] for i in range(0,len(str(text)),96)] or [""]:
+            if y < 65: pdf.showPage(); y = height-52
+            pdf.setFont("Helvetica-Bold" if bold else "Helvetica", 11 if bold else 9)
             pdf.drawString(48,y,segment); y -= gap
     pdf.setTitle(row.title); pdf.setFont("Helvetica-Bold",19); pdf.drawString(48,y,"SustainBuild AI - Construction Planning Report"); y-=28
     line(project.name, True); line(f"Building: {project.building_type} | Region: {project.region} | Demo data status: synthetic")
@@ -840,6 +913,33 @@ def create_project_report(project_id: int, db: Session = Depends(get_db), user=D
                 ("Confirmed conceptual geometry",data.get("geometry",{})),("Simulations performed",data.get("simulations",{})),
                 ("Adaptations tested",data.get("adaptations",{})),("Sustainability assessment",data.get("sustainability",{}))]
     for title, content in sections: line(title,True,18); line(content)
+    study = data.get("resilience")
+    if study:
+        inputs, result = study["input"], study["result"]
+        line("Resilience Lab - saved design comparison", True, 18)
+        line(f"Water: {inputs['water_level_m']} m; extra clearance: {inputs['freeboard_m']} m; budget: EUR {inputs['budget_eur']:,.2f}")
+        line(f"Target: {'floor and equipment' if inputs.get('protect_floor', True) else 'equipment only'}; baseline floor: {inputs['baseline_floor_m']} m; baseline equipment: {inputs['baseline_equipment_m']} m")
+        line(f"Confirmed footprint: {result['area_m2']} m2; status: {result['status']}; combinations checked: {result['evaluated_count']}")
+        for option in result["options"]:
+            line(f"{', '.join(option['badges'])}: EUR {option['cost_eur']:,.2f}; added carbon {option['added_carbon_kg']/1000:.2f} tCO2e")
+            line(f"Floor {option['floor_m']} m; equipment {option['equipment_m']} m; selected target met up to {option['max_water_level_m']} m water.")
+        if result.get("budget_gap_eur"):
+            line(f"Additional budget needed within catalogue: EUR {result['budget_gap_eur']:,.2f}")
+        line("Editable demonstration unit assumptions", True)
+        assumption_labels = {
+            "standard_cost_m3": "Standard platform (EUR/m3)", "lower_carbon_cost_m3": "Reduced-carbon mix (EUR/m3)",
+            "standard_carbon_kg_m3": "Standard platform (kgCO2e/m3)", "lower_carbon_kg_m3": "Reduced-carbon mix (kgCO2e/m3)",
+            "equipment_fixed_cost": "Equipment setup (EUR)", "equipment_cost_m": "Equipment lift (EUR/m)",
+            "equipment_fixed_carbon_kg": "Equipment setup (kgCO2e)", "equipment_carbon_kg_m": "Equipment lift (kgCO2e/m)",
+        }
+        for key, value in inputs.get("assumptions", {}).items(): line(f"{assumption_labels.get(key, key)}: {value}")
+        for assumption in result["assumptions"]: line(assumption)
+    applied = data.get("resilience_applied")
+    if applied:
+        option = applied["option"]
+        line("Applied design (may originate from an earlier comparison)", True, 18)
+        line(f"Comparison {applied['study_id']}; {option['name']}; floor {option['floor_m']} m; equipment {option['equipment_m']} m")
+        line(f"Saved cost allowance EUR {option['cost_eur']:,.2f}; added carbon {option['added_carbon_kg']/1000:.2f} tCO2e")
     line("Decision context",True,18); line("Use this report to compare visible assumptions and trade-offs. It does not grant permission or replace architects, engineers, environmental consultants, authorities, or official hazard assessments.")
     line("Data provenance",True,18); line("SustainBuild curated hackathon dataset; synthetic/modelled status; retrieved 2026-10-24. User-selected stress tests are hypothetical.")
     pdf.save(); row.file_path=str(path); db.commit(); db.refresh(row)

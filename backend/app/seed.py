@@ -180,8 +180,8 @@ def seed_demo():
             s = Scenario(facility_id=facilities[0].id, weather_event_id=events[0].id, name=name,
                          scenario_type="prepared" if selected else "unprepared", assumptions_json={"selected_action_ids": selected})
             db.add(s); db.flush(); db.add(ScenarioResult(scenario_id=s.id, results_json=calculate_exposure(assets, events[0], selected)))
-        upload_dir = Path(__file__).resolve().parents[1] / "uploads"
-        upload_dir.mkdir(exist_ok=True)
+        upload_dir = Path(os.getenv("UPLOAD_DIR", str(Path(__file__).resolve().parents[1] / "uploads")))
+        upload_dir.mkdir(parents=True, exist_ok=True)
         blueprint_path = upload_dir / "synthetic-logistics-blueprint.svg"
         blueprint_path.write_text('''<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="650" viewBox="0 0 1000 650"><rect width="1000" height="650" fill="#f7f8f5"/><g fill="none" stroke="#243b37" stroke-width="6"><rect x="70" y="60" width="860" height="520"/><path d="M70 420h860M340 60v360M720 60v360"/><rect x="110" y="110" width="180" height="240"/><rect x="390" y="110" width="280" height="240"/><rect x="770" y="110" width="110" height="240"/></g><g font-family="Arial" font-size="25" fill="#243b37"><text x="130" y="150">STORAGE</text><text x="440" y="150">SORTING HALL</text><text x="780" y="150">ELECTRICAL</text><text x="400" y="490">LOADING / ACCESS</text><text x="70" y="625">SYNTHETIC CONCEPT PLAN · NOT FOR CONSTRUCTION</text></g></svg>''', encoding="utf-8")
         bp = Blueprint(facility_id=facilities[5].id, filename=blueprint_path.name, storage_path=str(blueprint_path), mime_type="image/svg+xml", processing_status="ready", extracted_data_json={"synthetic": True})

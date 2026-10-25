@@ -1,7 +1,11 @@
 import os
+import shutil
+import tempfile
 
 os.environ["DATABASE_URL"] = "sqlite:///./test_beforeimpact.db"
 os.environ["APP_ENV"] = "demo"
+_TEST_UPLOADS = tempfile.mkdtemp(prefix="sustainbuild-tests-")
+os.environ["UPLOAD_DIR"] = _TEST_UPLOADS
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,6 +22,7 @@ def database():
     seed_demo()
     yield
     Base.metadata.drop_all(engine)
+    shutil.rmtree(_TEST_UPLOADS)
 
 
 @pytest.fixture()
